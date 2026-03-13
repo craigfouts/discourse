@@ -1,1 +1,1 @@
-# Discourse - Experiments with Coursework and Tutorials
+# Discourse - Experiments with Building Tutorials
