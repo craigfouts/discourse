@@ -1,2 +1,1 @@
-# discourse
-Project Discourse
+# Discourse - Experiments with Coursework and Tutorials
