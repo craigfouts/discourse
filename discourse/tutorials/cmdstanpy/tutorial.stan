@@ -1,10 +1,10 @@
 functions {
     vector f(real t, vector y, real R, real K) {
-        vector[1] dy;
+        vector[1] dy_dt;
 
-        dy[1] = y[1]*R*(1 - y[1]/K);
+        dy_dt[1] = y[1]*R*(1 - y[1]/K);
 
-        return dy;
+        return dy_dt;
     }
 }
 
@@ -28,7 +28,7 @@ transformed parameters {
     array[T] vector[1] z;
 
     z[1, 1] = y0;
-    z[2:T, 1] = ode_rk45(f, to_vector({y0}), t[1], t[2:T], R, K)[, 1];
+    z[2:T, 1] = ode_rk45(f, z[1,], t[1], t[2:T], R, K)[,1];
 }
 
 model {
