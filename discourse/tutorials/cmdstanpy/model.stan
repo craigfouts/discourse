@@ -1,10 +1,10 @@
 functions {
-    vector f(real t, vector y, real R, real K) {
-        vector[1] dy_dt;
+    vector f(real t, vector z, real R, real K) {
+        vector[1] dz_dt;
 
-        dy_dt[1] = y[1]*R*(1 - y[1]/K);
+        dz_dt[1] = z[1]*R*(1 - z[1]/K);
 
-        return dy_dt;
+        return dz_dt;
     }
 }
 
@@ -19,9 +19,10 @@ data {
 
 parameters {
     real<lower=0> y0;  // Initial condition
+    real<lower=0> S;  // Noise scale
     real<lower=0> R;  // Growth rate
     real<lower=0> K;  // Carrying capacity
-    real<lower=0> S;  // Noise scale
+
 }
 
 transformed parameters {
@@ -33,9 +34,9 @@ transformed parameters {
 
 model {
     y0 ~ std_normal();
+    S ~ std_normal();
     R ~ std_normal();
     K ~ normal(10, 1);
-    S ~ std_normal();
 
     if (include_likelihood)
         y ~ normal(z[t_idx, 1], S);
