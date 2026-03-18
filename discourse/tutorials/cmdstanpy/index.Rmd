@@ -4,6 +4,8 @@ author: 'Craig Fouts (adapted from [*Fitting ODEs in Stan*](https://github.com/t
 date: '`r Sys.Date()`'
 output:
     html_document:
+        includes:
+            in_header: header.html
         number_sections: true
         toc: true
         toc_float: true
