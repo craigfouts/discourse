@@ -22,7 +22,6 @@ parameters {
     real<lower=0> S;  // Noise scale
     real<lower=0> R;  // Growth rate
     real<lower=0> K;  // Carrying capacity
-
 }
 
 transformed parameters {
