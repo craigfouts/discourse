@@ -49,7 +49,7 @@ The mean population, $z(t)$, grows over time, $t$, at a growth rate of $\rho$. G
 
 ```{python}
 def f(t, z, R, K):
-    dz_dt = z*R*(1 - z/K)
+    dz_dt = R*z*(1 - z/K)
 
     return dz_dt
 ```

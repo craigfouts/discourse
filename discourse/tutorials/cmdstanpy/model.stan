@@ -2,7 +2,7 @@ functions {
     vector f(real t, vector z, real R, real K) {
         vector[1] dz_dt;
 
-        dz_dt[1] = z[1]*R*(1 - z[1]/K);
+        dz_dt[1] = R*z[1]*(1 - z[1]/K);
 
         return dz_dt;
     }

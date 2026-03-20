@@ -11,7 +11,7 @@
 
 <meta name="author" content="Craig Fouts (adapted from Fitting ODEs in Stan)" />
 
-<meta name="date" content="2026-03-19" />
+<meta name="date" content="2026-03-20" />
 
 <title>Fitting ODEs with CmdStanPy</title>
 
@@ -1505,7 +1505,7 @@ border-radius: 0px;
 <h1 class="title toc-ignore">Fitting ODEs with CmdStanPy</h1>
 <h4 class="author">Craig Fouts (adapted from <a href="https://github.com/tah17/fitting-odes-stan-walkthrough"><em>Fitting
 ODEs in Stan</em></a>)</h4>
-<h4 class="date">2026-03-19</h4>
+<h4 class="date">2026-03-20</h4>
 
 </div>
 
@@ -1700,7 +1700,7 @@ draw samples from the fitted model.</p>
     vector f(real t, vector z, real R, real K) {
         vector[1] dz_dt;
 
-        dz_dt[1] = z[1]*R*(1 - z[1]/K);
+        dz_dt[1] = R*z[1]*(1 - z[1]/K);
 
         return dz_dt;
     }
@@ -1828,7 +1828,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">1.4831</td>
 <td align="center">1954.8600</td>
 <td align="center">1811.0000</td>
-<td align="center">2318.9300</td>
+<td align="center">2270.4500</td>
 <td align="center">1.0021</td>
 </tr>
 <tr class="even">
@@ -1842,7 +1842,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">1.7142</td>
 <td align="center">2254.3000</td>
 <td align="center">1824.2700</td>
-<td align="center">2674.1400</td>
+<td align="center">2618.2300</td>
 <td align="center">1.0010</td>
 </tr>
 <tr class="odd">
@@ -1856,7 +1856,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">0.4576</td>
 <td align="center">1817.1800</td>
 <td align="center">1907.7800</td>
-<td align="center">2155.6100</td>
+<td align="center">2110.5400</td>
 <td align="center">1.0023</td>
 </tr>
 <tr class="even">
@@ -1870,7 +1870,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">11.6888</td>
 <td align="center">2467.9100</td>
 <td align="center">2285.5200</td>
-<td align="center">2927.5300</td>
+<td align="center">2866.3300</td>
 <td align="center">1.0015</td>
 </tr>
 </tbody>

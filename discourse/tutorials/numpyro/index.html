@@ -1558,7 +1558,7 @@ over time, <span class="math inline">\(t\)</span>, at a growth rate of
 population reaches its theoretical limit, <span class="math inline">\(\kappa\)</span>, often called the <strong>carrying
 capacity</strong>. This model is defined in Python as follows:</p>
 <pre class="python"><code>def f(t, z, R, K):
-    dz_dt = z*R*(1 - z/K)
+    dz_dt = R*z*(1 - z/K)
 
     return dz_dt</code></pre>
 </div>
@@ -1656,8 +1656,8 @@ prior choise is important! Further information on choosing priors can be
 found in <span class="citation">(Gelman et al. 2013)</span> and <span class="citation">(Gelman et al. 2020)</span>.</p>
 <p>Finally, to fit the model, we need only run the following
 commands:</p>
-<pre class="python"><code>fit = MCMC(NUTS(model, init_strategy=init_to_sample()), num_warmup=1000, num_samples=1000, num_chains=4)
-fit.run(PRNGKey(seed), t=df[&#39;time&#39;].to_numpy(), y=df[&#39;y&#39;].to_numpy())</code></pre>
+<pre class="python"><code>fit = MCMC(NUTS(model, init_strategy=init_to_sample()), num_warmup=1000, num_samples=1000, num_chains=4)</code></pre>
+<pre class="python"><code>fit.run(PRNGKey(seed), t=df[&#39;time&#39;].to_numpy(), y=df[&#39;y&#39;].to_numpy())</code></pre>
 <p>Here, the output is hidden as it is quite long, but NumPyro will
 output progress bars for sampling from the posterior along each chain,
 with the time taken for sampling given at the end. Any warnings about
