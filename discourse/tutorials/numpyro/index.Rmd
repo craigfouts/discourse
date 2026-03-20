@@ -1,0 +1,159 @@
+---
+title: 'Fitting ODEs with NumPyro'
+author: 'Craig Fouts (adapted from [*Fitting ODEs in Stan*](https://github.com/tah17/fitting-odes-stan-walkthrough))'
+date: '`r Sys.Date()`'
+output:
+    html_document:
+        includes:
+            in_header: header.html
+        number_sections: true
+        toc: true
+        toc_float: true
+bibliography: references.bib
+---
+
+# Introduction
+
+This article intended to be a guide for fitting Ordinary Differential Equation (ODE) models using NumPyro, a probabilistic programming language for performing Bayesian inference in Python. Often, when modelling, we want to be able to quantify the uncertainty of our estimates. Bayesian inference allows us to do this in a principled manner for ODE models. All technical details mentioned here closely follow the [NumPyro](https://num.pyro.ai/en/stable/) [@numpyro2025] user manual and Bayesian Data Analysis textbook [@gelman2013]. For a more detailed explanation on modelling with NumPyro, please refer to the [NumPyro](https://num.pyro.ai/en/stable/) documentation.
+
+Before going through the example, let's import the relevant libraries and set a random seed.
+
+```{python, results='hide'}
+import jax.numpy as jnp
+import matplotlib.pyplot as plt
+import numpy as np
+import numpyro
+import numpyro.distributions as dist
+import pyreadr
+from IPython.display import Markdown
+from jax.experimental.ode import odeint
+from jax.random import PRNGKey
+from numpyro.infer import MCMC, NUTS, init_to_sample
+```
+
+```{python}
+seed = 739485
+```
+
+The example in this article is about fitting a simple logistic ODE to some pre-generated fake data. Below, we'll discuss how the ODE is defined ([The Model]), what the fake data looks like ([The Data]), how to fit the model to the data ([Model Fitting]), and how to check the model fit for convergence ([Checking Model Fit]).
+
+# The Model
+
+The logistic growth model is a popular autonomous one-dimensional ODE often used for modelling populations over time:
+
+$$
+\frac{dz}{dt} \, = \, f \left( z \right) \, = \, \rho \, z \, \left( 1 - \frac{z}{\kappa} \right)
+$$
+
+The mean population, $z(t)$, grows over time, $t$, at a growth rate of $\rho$. Growth slows as the population reaches its theoretical limit, $\kappa$, often called the **carrying capacity**. This model is defined in Python as follows:
+
+```{python}
+def f(t, z, R, K):
+    dz_dt = z*R*(1 - z/K)
+
+    return dz_dt
+```
+
+# The Data
+
+The fake data (provided in `data/data.Rda`) was actually generated using our logistic model. That being said, for the purposes of this example, we will imagine the data, $y$, is the concentration of some population growing over time, $t$, that has been recorded in an experiment in which we assume some observational noise has been introduced during data collection. The aim is to fit the logistic ODE to this collected data, estimate important parameter values (like the growth rate, $\beta$), and to quantify the uncertainty of our estimates.
+
+First, let's read in the data from `data/data.Rda`:
+
+```{python}
+df = pyreadr.read_r('data/data.Rda')[None]
+Markdown(df.head().to_markdown(index=False, numalign='center', floatfmt='.6f'))
+```
+
+Next, let's plot the data to see what it looks like:
+
+```{python, fig.align='center'}
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.grid(alpha=.5)
+ax.scatter(df['time'], df['y'], s=100, zorder=2)
+ax.set_xlabel('Time')
+ax.set_ylabel('y', rotation=0.)
+fig.tight_layout()
+```
+
+# Model Fitting
+
+To fit the logistic ODE using Numpyro, `model` function needs to be defined. In our `model` function, the desired likelihood and any necessary priors can be specified. One of the simplest **likelihoods** is a Gaussian, where we assume our data $y_t$ at time $t$ is normally distributed about the ODE solution, $z(t)$, with noise scaled by $\sigma$:
+
+$$
+y_t \sim \text{N} \left( z(t), \, \sigma \right)
+$$
+
+In NumPyro, this is written in the `model` function as follows:
+
+```{python, eval=FALSE}
+numpyro.sample('y', dist.Normal(z, S), obs=y)
+```
+
+We also assume the following **priors**:
+
+$$
+\begin{align*}
+    y_0 &\sim \text{N}^+ \left(0, \, 1 \right) \\
+    \sigma &\sim \text{N}^+ \left(0, \, 1 \right) \\
+    \rho &\sim \text{N}^+ \left(0, \, 1 \right) \\
+    \kappa &\sim \text{N}^+ \left(10, \, 1 \right)
+\end{align*}
+$$
+
+These are similarly specified in the `model` function:
+
+```{python}
+def model(t, y=None):
+    y0 = numpyro.sample('y0', dist.Normal(0., 1.))
+    S = numpyro.sample('S', dist.Normal(jnp.zeros(1), jnp.ones(1)))
+    R = numpyro.sample('R', dist.Normal(jnp.zeros(1), jnp.ones(1)))
+    K = numpyro.sample('K', dist.Normal(10.*jnp.ones(1), jnp.ones(1)))
+    z = odeint(f, y0, t, R, K)
+
+    if y is not None:
+        numpyro.sample('y', dist.Normal(z, S), obs=y)
+    else:
+        numpyro.sample('y', dist.Normal(z, S))
+```
+
+These priors are chosen somewhat arbitrarily for this example, but prior choise is important! Further information on choosing priors can be found in [@gelman2013] and [@gelman2020].
+
+Finally, to fit the model, we need only run the following commands:
+
+```{python, results='hide'}
+fit = MCMC(NUTS(model, init_strategy=init_to_sample()), num_warmup=1000, num_samples=1000, num_chains=4)
+fit.run(PRNGKey(seed), t=df['time'].to_numpy(), y=df['y'].to_numpy())
+```
+
+Here, the output is hidden as it is quite long, but NumPyro will output progress bars for sampling from the posterior along each chain, with the time taken for sampling given at the end. Any warnings about convergence will also be given here.
+
+# Checking Model Fit
+
+In the above `fit = MCMC(...)` definition, the keyword argument `num_chains=4` was set to specify that we want to run four chains independently. This is mainly done so we can assess if the chains have converged to the same and (what we assume to be) true posterior distribution.
+
+In reality, we cannot know if the chains have converged to the true posterior, as we do not know what the true posterior is. Instead, signs of non-convergence are monitored. One way to do this is by plotting the posterior sample draws over iterations for each chain (i.e., a **trace plot**) to make sure the chains are well **mixed** and **stationary**. The chains should all converge to the same posterior (i.e., be well *mixed*) and they should actually converge to a distribution and stay there (i.e., be *stationary*) [@gelman2013]. If the chains are not well mixed or stationary (e.g., if the chains' sampling paths appear to be completely distinct or drift), these are signs of non-convergence and samples taken from these chains should not be used further.
+
+```{python, fig.align='center'}
+params = (draws := fit.get_samples()).keys()
+fig, axes = plt.subplots(round(len(params)/2), 2, figsize=(8, 4))
+
+for ax, param in zip(axes.flatten(), params):
+    ax.grid(alpha=.5)
+    param_draws = draws[param].reshape(fit.num_samples, fit.num_chains)
+    param_lines = ax.plot(param_draws, alpha=.5, linewidth=.5)
+    ax.set(title=param, xlabel='Draw')
+
+fig.legend(param_lines, jnp.arange(fit.num_chains), title='chain', bbox_to_anchor=(1.08, .68))
+fig.tight_layout()
+```
+
+The trace plots look okay. However, visual assessment can be subjective, so convergence is also assessed using the Gelman-Rubin metric, $\widehat{\, R}$ [@vehtari2021], which can be thought of as a numerical value summarising the above. Usually, a value of $\widehat{\, R}$ > 1.01 is used as a heuristic to diagnose lack of convergence.
+
+```{python}
+fit.print_summary()
+```
+
+The $\widehat{\, R}$ values listed in the last column of the table above look to be < 1.01!
+
+# References
