@@ -42,6 +42,6 @@ model {
 }
 
 generated quantities {
-    array[N] real y_rep = normal_rng(z[t_idx, 1], S);  // Posterior predictive
     array[N] real z_rep = z[t_idx, 1];  // Posterior samples of ODE solution
+    array[N] real y_rep = normal_rng(z_rep, S);  // Posterior predictive
 }

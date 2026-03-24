@@ -1740,8 +1740,8 @@ model {
 }
 
 generated quantities {
-    array[N] real y_rep = normal_rng(z[t_idx, 1], S);  // Posterior predictive
     array[N] real z_rep = z[t_idx, 1];  // Posterior samples of ODE solution
+    array[N] real y_rep = normal_rng(z_rep, S);  // Posterior predictive
 }</code></pre>
 </div>
 </div>
@@ -1828,7 +1828,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">1.4831</td>
 <td align="center">1954.8600</td>
 <td align="center">1811.0000</td>
-<td align="center">2324.4500</td>
+<td align="center">2297.1300</td>
 <td align="center">1.0021</td>
 </tr>
 <tr class="even">
@@ -1842,7 +1842,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">1.7142</td>
 <td align="center">2254.3000</td>
 <td align="center">1824.2700</td>
-<td align="center">2680.5000</td>
+<td align="center">2649.0000</td>
 <td align="center">1.0010</td>
 </tr>
 <tr class="odd">
@@ -1856,7 +1856,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">0.4576</td>
 <td align="center">1817.1800</td>
 <td align="center">1907.7800</td>
-<td align="center">2160.7300</td>
+<td align="center">2135.3400</td>
 <td align="center">1.0023</td>
 </tr>
 <tr class="even">
@@ -1870,7 +1870,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">11.6888</td>
 <td align="center">2467.9100</td>
 <td align="center">2285.5200</td>
-<td align="center">2934.5000</td>
+<td align="center">2900.0100</td>
 <td align="center">1.0015</td>
 </tr>
 </tbody>
