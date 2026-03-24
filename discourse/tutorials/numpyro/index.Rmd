@@ -151,7 +151,7 @@ fig.tight_layout()
 The trace plots look okay. However, visual assessment can be subjective, so convergence is also assessed using the Gelman-Rubin metric, $\widehat{\, R}$ [@vehtari2021], which can be thought of as a numerical value summarising the above. Usually, a value of $\widehat{\, R}$ > 1.01 is used as a heuristic to diagnose lack of convergence.
 
 ```{python}
-fit.print_summary()
+Markdown(fit.print_summary())
 ```
 
 The $\widehat{\, R}$ values listed in the last column of the table above look to be < 1.01!

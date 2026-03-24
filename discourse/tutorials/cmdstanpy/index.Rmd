@@ -33,7 +33,7 @@ seed = 739485
 rng = np.random.default_rng(seed)
 ```
 
-The example in this article is about fitting a simple logistic ODE to some pre-generated fake data. Below, we'll discuss how the ODE is defined ([The Model]), what the fake data looks like ([The Data]), how to fit the model to the data ([Model Fitting]), and how to check the model fit for convergence ([Checking Model Fit]).
+The example in this article is about fitting a simple logistic ODE to some pre-generated fake data. Below, we'll discuss how the ODE is defined ([The Model]), what the fake data looks like ([The Data]), how to fit the model to the data ([Model Fitting]), how to check the model fit for convergence ([Checking Model Fit]), and how to visualise the estimated parameterisation ([Plotting Model Fit] and [Estimating Parameters]).
 
 # The Model
 
@@ -208,11 +208,11 @@ fig, axes = plt.subplots(round(len(params)/2), 2, figsize=(8, 4))
 
 for ax, param in zip(axes.flatten(), params):
     ax.grid(alpha=.5)
-    param_draws = draws[param].to_numpy().reshape(n_draws//n_chains, n_chains)
-    param_lines = ax.plot(param_draws, alpha=.5, linewidth=.5)
+    d = draws[param].to_numpy().reshape(n_draws//n_chains, n_chains)
+    pl = ax.plot(d, alpha=.5, linewidth=.5)
     ax.set(title=param, xlabel='Draw')
 
-fig.legend(param_lines, np.arange(n_chains), title='chain')
+fig.legend(pl, np.arange(n_chains), title='chain')
 fig.tight_layout()
 ```
 
@@ -229,9 +229,9 @@ The $\widehat{\, R}$ values listed in the last column of the table above look to
 During fitting, it was assumed that each data point, $y_t$, is normally distributed about the ODE solution, $z(t)$, with some noise scaled by $\sigma$ at time $t$. Since there are no signs of non-convergence so far, we can plot posterior samples of $z(t)$ to see if they align with the mean of the data and thus check that our fitted model can at least visually capture the general trends of the data:
 
 ```{python, fig.align='center'}
-keys = [f'z_rep[{i + 1}]' for i in range(data['N'])]
+z_keys = [f'z_rep[{i + 1}]' for i in range(data['N'])]
 sample_idx = rng.integers(0, n_draws, 100)
-z = draws[keys].loc[sample_idx].T.to_numpy()
+z = draws[z_keys].loc[sample_idx].T.to_numpy()
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.grid(alpha=.5)
 ax.plot(data['t'], z, alpha=.5, linewidth=.5)
@@ -241,6 +241,70 @@ ax.set_ylabel('z', rotation=0.)
 fig.tight_layout()
 ```
 
-Here, the lines are draws of the ODE solution, $z(t)$, that are obtained using samples from the posterior $\text{p} \left( \theta \, | \, y \right)$, and the dots show the data points, $y$, used to fit the model. The fit looks okay so far! For further information on visual checking of model fit, please refer to [@gelman2020] and [@gabry2019].
+Here, the lines are draws of the ODE solution, $z(t)$, that are obtained using samples from the posterior $p(\theta \, | \, y)$, and the dots show the data points, $y$, used to fit the model. 
+
+We can also plot samples from the posterior predictive distribution, $p(y^\text{rep} \, | \, y)$, to check how well our entire model, with assumed priors and likelihood, fits the data [@gelman2013]:
+
+$$
+p(y^\text{rep} \, | \, y) = \int p(y^\text{rep} \, | \, \theta) p(\theta \, | \, y) d\theta
+$$
+
+The fit model should be able to generate data under the posterior predictive distribution that resembles the observed data [@gelman2013]:
+
+```{python, fig.align='center'}
+y_keys = [f'y_rep[{i + 1}]' for i in range(data['N'])]
+y = (y_draws := draws[y_keys].T.to_numpy()).mean(-1)
+d = np.sort(np.sqrt(np.square((y_draws - y[:, None]))), -1)
+levels, colors, fills = (.95, .8, .5), ('#e2c6a6', '#d1b150', '#d17d68'), []
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.grid(alpha=.5)
+
+for level, color in zip(levels, colors):
+    h = d[:, round(level*d.shape[1])]
+    fills.append(ax.fill_between(data['t'], y - h, y + h, color=color, zorder=2))
+
+ax.plot(data['t'], y, linewidth=2., color='black')
+ax.scatter(df['time'], df['y'], s=10, c='black', zorder=2)
+ax.set_xlabel('Time')
+ax.set_ylabel('z', rotation=0.)
+fig.legend(fills, levels, title='level')
+fig.tight_layout()
+```
+
+Here, "level" refers to the $100 \times$ level % credible interval of the posterior predictive distribution. The fit looks good so far! For further information on visual checking of model fit, please refer to [@gabry2019] and [@gelman2020].
+
+# Estimating Parameters
+
+Once the model has been visually assessed as we did in the previous section, we can go ahead and visualise the posterior distribution of the parameters themselves. Since we have fit the model to its own fake data, we can also compare our inferred distributions to the true parameter values that were used to generate the fake data and thus check the validity of our parameter estimates:
+
+```{python, results='hide', fig.aling='center'}
+true_params = pyreadr.read_r('data/params.Rda')['params']
+param_keys = [param for param in params if param in true_params][::-1]
+fig, ax = plt.subplots(figsize=(8, 4))
+ax.grid(alpha=.5)
+
+for (idx, param), color in zip(enumerate(param_keys), colors):
+    vp = ax.violinplot(draws[param], [idx], orientation='horizontal', showextrema=False, side='high')
+    vp['bodies'][0].set_facecolor(color)
+    vp['bodies'][0].set_alpha(1.)
+    vp['bodies'][0].set_zorder(2)
+    param_mean = fit.summary()['Mean'][param]
+    d = np.argsort(np.sqrt(np.square((draws[param] - param_mean))))
+    ci_50, ci_95 = draws[param][d[:round(.5*len(draws))]], draws[param][d[:round(.95*len(draws))]]
+    ax.plot(ci_50, (idx - .005)*np.ones_like(ci_50), linewidth=3., color='#683f34')
+    ax.plot(ci_95, (idx - .005)*np.ones_like(ci_95), linewidth=1., color='#683f34')
+    ax.scatter(param_mean, idx, zorder=2, color='#683f34')
+    param_value = true_params[param].item()
+    ax.scatter(param_value, idx, s=50, linewidths=2., facecolors='white', edgecolors='black', zorder=2)
+
+ax.set_yticks(range(len(param_keys)), param_keys)
+ax.set_xlabel('Value')
+ax.set_ylabel('Parameter')
+fig.tight_layout()
+```
+
+Here, the distributions of the parameter draws are shown (brown dots are means, thick lines are 50% credible intervals, and thin lines are 95% credible intervals) along with the true parameter values (white circles). It is a good check to verify that the estimated 95% credible intervals include the true parameter values.
+
+I didn't include `K` above or save it in `params.Rmd` as its scale is completely different from the other parameters (making visualisation a bit difficult), but you can (with some modification to the code in the loop) add it to the `param_keys` line if you want to visualise the estimate.
 
 # References
