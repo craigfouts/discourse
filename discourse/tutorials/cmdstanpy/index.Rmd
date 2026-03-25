@@ -61,11 +61,12 @@ Markdown(df.head().to_markdown(index=False, numalign='center', floatfmt='.6f'))
 Let's plot the data to see what it looks like:
 
 ```{python, fig.align='center'}
+t = df['time']
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.grid(alpha=.5)
-ax.scatter(df['time'], df['y'], s=100, zorder=2)
+ax.scatter(t, df['y'], s=100, zorder=2)
 ax.set_xlabel('Time')
-ax.set_ylabel('y', rotation=0.)
+ax.set_ylabel(ylabel='y', rotation=0.)
 fig.tight_layout()
 ```
 
@@ -75,16 +76,15 @@ Next, we'll have to create a custom data object since Stan expects a particular 
 
 ```{python}
 # Only want to solve the ODE at unique time points to reduce runtime
-time_pts = np.sort(df['time'].unique())
-time_idx = [np.where(time_pts == t)[0].item() + 1 for t in df['time']]
+time_pts = np.sort(t.unique())
 
-# Dictionary of data corresponding to the model definition in `model.stan`
-data = {
+# Dictionary of data corresponding to the model definition in 'cmdstanpy.stan'
+stan_data = {
     'N': len(df),
     'T': len(time_pts),
     'y': df['y'].to_numpy(),
     't': time_pts,
-    't_idx': time_idx,
+    't_idx': [np.where(time_pts == t)[0].item() + 1 for t in df['time']],
     'include_likelihood': True
 }
 ```
@@ -135,7 +135,7 @@ Finally, to fit the model, we need only run the following commands:
 
 ```{python, results='hide'}
 model = CmdStanModel(stan_file='model.stan')
-fit = model.sample(data, chains=4, seed=seed)
+fit = model.sample(stan_data, chains=4, seed=seed)
 ```
 
 Here, the output is hidden as it is quite long, but Stan will output progress bars for sampling from the posterior along each chain, with the time taken for sampling given at the end. Any warnings about convergence will also be given here.
@@ -208,11 +208,11 @@ fig, axes = plt.subplots(round(len(params)/2), 2, figsize=(8, 4))
 
 for ax, param in zip(axes.flatten(), params):
     ax.grid(alpha=.5)
-    d = draws[param].to_numpy().reshape(n_draws//n_chains, n_chains)
-    pl = ax.plot(d, alpha=.5, linewidth=.5)
+    param_draws = draws[param].to_numpy().reshape(n_draws//n_chains, n_chains)
+    lines = ax.plot(param_draws, alpha=.5, linewidth=.5)
     ax.set(title=param, xlabel='Draw')
 
-fig.legend(pl, np.arange(n_chains), title='chain')
+fig.legend(lines, np.arange(n_chains), title='chain', bbox_to_anchor=(1.08, .68))
 fig.tight_layout()
 ```
 
@@ -229,13 +229,13 @@ The $\widehat{\, R}$ values listed in the last column of the table above look to
 During fitting, it was assumed that each data point, $y_t$, is normally distributed about the ODE solution, $z(t)$, with some noise scaled by $\sigma$ at time $t$. Since there are no signs of non-convergence so far, we can plot posterior samples of $z(t)$ to see if they align with the mean of the data and thus check that our fitted model can at least visually capture the general trends of the data:
 
 ```{python, fig.align='center'}
-z_keys = [f'z_rep[{i + 1}]' for i in range(data['N'])]
+z_keys = [f'z_rep[{i + 1}]' for i in range(stan_data['N'])]
 sample_idx = rng.integers(0, n_draws, 100)
 z = draws[z_keys].loc[sample_idx].T.to_numpy()
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.grid(alpha=.5)
-ax.plot(data['t'], z, alpha=.5, linewidth=.5)
-ax.scatter(df['time'], df['y'], s=10, c='black', zorder=2)
+ax.plot(stan_data['t'], z, alpha=.5, linewidth=.5)
+ax.scatter(t, df['y'], s=10, c='black', zorder=2)
 ax.set_xlabel('Time')
 ax.set_ylabel('z', rotation=0.)
 fig.tight_layout()
@@ -252,7 +252,7 @@ $$
 The fit model should be able to generate data under the posterior predictive distribution that resembles the observed data [@gelman2013]:
 
 ```{python, fig.align='center'}
-y_keys = [f'y_rep[{i + 1}]' for i in range(data['N'])]
+y_keys = [f'y_rep[{i + 1}]' for i in range(stan_data['N'])]
 y = (y_draws := draws[y_keys].T.to_numpy()).mean(-1)
 d = np.sort(np.sqrt(np.square((y_draws - y[:, None]))), -1)
 levels, colors, fills = (.95, .8, .5), ('#e2c6a6', '#d1b150', '#d17d68'), []
@@ -261,13 +261,13 @@ ax.grid(alpha=.5)
 
 for level, color in zip(levels, colors):
     h = d[:, round(level*d.shape[1])]
-    fills.append(ax.fill_between(data['t'], y - h, y + h, color=color, zorder=2))
+    fills.append(ax.fill_between(stan_data['t'], y - h, y + h, color=color, zorder=2))
 
-ax.plot(data['t'], y, linewidth=2., color='black')
-ax.scatter(df['time'], df['y'], s=10, c='black', zorder=2)
+ax.plot(stan_data['t'], y, linewidth=2., color='black')
+ax.scatter(t, df['y'], s=10, c='black', zorder=2)
 ax.set_xlabel('Time')
 ax.set_ylabel('z', rotation=0.)
-fig.legend(fills, levels, title='level')
+fig.legend(fills, levels, title='level', bbox_to_anchor=(1.12, .68))
 fig.tight_layout()
 ```
 
@@ -283,19 +283,19 @@ param_keys = [param for param in params if param in true_params][::-1]
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.grid(alpha=.5)
 
-for (idx, param), color in zip(enumerate(param_keys), colors):
-    vp = ax.violinplot(draws[param], [idx], orientation='horizontal', showextrema=False, side='high')
-    vp['bodies'][0].set_facecolor(color)
-    vp['bodies'][0].set_alpha(1.)
-    vp['bodies'][0].set_zorder(2)
-    param_mean = fit.summary()['Mean'][param]
-    d = np.argsort(np.sqrt(np.square((draws[param] - param_mean))))
-    ci_50, ci_95 = draws[param][d[:round(.5*len(draws))]], draws[param][d[:round(.95*len(draws))]]
-    ax.plot(ci_50, (idx - .005)*np.ones_like(ci_50), linewidth=3., color='#683f34')
-    ax.plot(ci_95, (idx - .005)*np.ones_like(ci_95), linewidth=1., color='#683f34')
-    ax.scatter(param_mean, idx, zorder=2, color='#683f34')
+for (i, param), color in zip(enumerate(param_keys), colors):
+    param_mean, param_draws = fit.summary()['Mean'][param], draws[param]
+    violin = ax.violinplot(param_draws, [i], orientation='horizontal', showextrema=False, side='high')
+    violin['bodies'][0].set_facecolor(color)
+    violin['bodies'][0].set_alpha(1.)
+    violin['bodies'][0].set_zorder(2)
+    d = np.argsort(np.sqrt(np.square((param_draws - param_mean))))
+    level_50, level_95 = param_draws[d[:round(.5*len(draws))]], param_draws[d[:round(.95*len(draws))]]
+    ax.plot(level_50, (i - .005)*np.ones_like(level_50), linewidth=3., color='#683f34')
+    ax.plot(level_95, (i - .005)*np.ones_like(level_95), linewidth=1., color='#683f34')
+    ax.scatter(param_mean, i, zorder=2, color='#683f34')
     param_value = true_params[param].item()
-    ax.scatter(param_value, idx, s=50, linewidths=2., facecolors='white', edgecolors='black', zorder=2)
+    ax.scatter(param_value, i, s=50, linewidths=2., facecolors='white', edgecolors='black', zorder=2)
 
 ax.set_yticks(range(len(param_keys)), param_keys)
 ax.set_xlabel('Value')
