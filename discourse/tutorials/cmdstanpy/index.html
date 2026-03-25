@@ -1512,8 +1512,8 @@ ODEs in Stan</em></a>)</h4>
 
 <div id="introduction" class="section level1" number="1">
 <h1><span class="header-section-number">1</span> Introduction</h1>
-<p>This article intended to be a guide for fitting Ordinary Differential
-Equation (ODE) models using Python and Stan via CmdStanPy (a Python
+<p>This article intended to be a guide for fitting ordinary differential
+equation (ODE) models using Python and Stan via CmdStanPy (a Python
 interface to CmdStan), where Stan is a probabilistic programming
 language for performing Bayesian inference and CmdStan is its command
 line interface. Often, when modelling, we want to be able to quantify
@@ -1565,13 +1565,13 @@ population growing over time, <span class="math inline">\(t\)</span>,
 that has been recorded in an experiment in which we assume some
 observational noise has been introduced during data collection. The aim
 is to fit the logistic ODE to this collected data, estimate important
-parameter values (like the growth rate, <span class="math inline">\(\beta\)</span>), and to quantify the uncertainty
-of our estimates.</p>
+parameter values (like the growth rate, <span class="math inline">\(\rho\)</span>), and to quantify the uncertainty of
+our estimates.</p>
 <div id="visualisation" class="section level2" number="3.1">
 <h2><span class="header-section-number">3.1</span> Visualisation</h2>
 <p>First, let’s read in the data from <code>data/data.Rda</code>:</p>
-<pre class="python"><code>df = pyreadr.read_r(&#39;data/data.Rda&#39;)[None]
-Markdown(df.head().to_markdown(index=False, numalign=&#39;center&#39;, floatfmt=&#39;.6f&#39;))</code></pre>
+<pre class="python"><code>data_df = pyreadr.read_r(&#39;data/data.Rda&#39;)[None]
+Markdown(data_df.head().to_markdown(index=False, numalign=&#39;center&#39;, floatfmt=&#39;.6f&#39;))</code></pre>
 <table>
 <thead>
 <tr class="header">
@@ -1603,10 +1603,10 @@ Markdown(df.head().to_markdown(index=False, numalign=&#39;center&#39;, floatfmt=
 </tbody>
 </table>
 <p>Let’s plot the data to see what it looks like:</p>
-<pre class="python"><code>t = df[&#39;time&#39;]
+<pre class="python"><code>y, t = data_df.values.T
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.grid(alpha=.5)
-ax.scatter(t, df[&#39;y&#39;], s=100, zorder=2)
+ax.scatter(t, y, s=100, zorder=2)
 ax.set_xlabel(&#39;Time&#39;)
 ax.set_ylabel(ylabel=&#39;y&#39;, rotation=0.)
 fig.tight_layout()</code></pre>
@@ -1617,15 +1617,15 @@ fig.tight_layout()</code></pre>
 <p>Next, we’ll have to create a custom data object since Stan expects a
 particular format:</p>
 <pre class="python"><code># Only want to solve the ODE at unique time points to reduce runtime
-time_pts = np.sort(t.unique())
+time_pts = np.sort(np.unique(t))
 
 # Dictionary of data corresponding to the model definition in &#39;cmdstanpy.stan&#39;
 stan_data = {
-    &#39;N&#39;: len(df),
+    &#39;N&#39;: len(data_df),
     &#39;T&#39;: len(time_pts),
-    &#39;y&#39;: df[&#39;y&#39;].to_numpy(),
+    &#39;y&#39;: y,
     &#39;t&#39;: time_pts,
-    &#39;t_idx&#39;: [np.where(time_pts == t)[0].item() + 1 for t in df[&#39;time&#39;]],
+    &#39;t_idx&#39;: [np.where(time_pts == time_pt)[0].item() + 1 for time_pt in t],
     &#39;include_likelihood&#39;: True
 }</code></pre>
 <p>Although not relevant to this example, even if there are multiple
@@ -1784,7 +1784,8 @@ subjective, so convergence is also assessed using the Gelman-Rubin
 metric, <span class="math inline">\(\widehat{\, R}\)</span> <span class="citation">(Vehtari et al. 2021)</span>, which can be thought of
 as a numerical value summarising the above. Usually, a value of <span class="math inline">\(\widehat{\, R}\)</span> &gt; 1.01 is used as a
 heuristic to diagnose lack of convergence.</p>
-<pre class="python"><code>Markdown(fit.summary().head()[1:].to_markdown(numalign=&#39;center&#39;, floatfmt=&#39;.4f&#39;))</code></pre>
+<pre class="python"><code>summary_df = fit.summary().head()[1:]
+Markdown(summary_df.to_markdown(numalign=&#39;center&#39;, floatfmt=&#39;.4f&#39;))</code></pre>
 <table style="width:100%;">
 <colgroup>
 <col width="3%" />
@@ -1828,7 +1829,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">1.4831</td>
 <td align="center">1954.8600</td>
 <td align="center">1811.0000</td>
-<td align="center">2310.7100</td>
+<td align="center">2275.7400</td>
 <td align="center">1.0021</td>
 </tr>
 <tr class="even">
@@ -1842,7 +1843,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">1.7142</td>
 <td align="center">2254.3000</td>
 <td align="center">1824.2700</td>
-<td align="center">2664.6500</td>
+<td align="center">2624.3300</td>
 <td align="center">1.0010</td>
 </tr>
 <tr class="odd">
@@ -1856,7 +1857,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">0.4576</td>
 <td align="center">1817.1800</td>
 <td align="center">1907.7800</td>
-<td align="center">2147.9600</td>
+<td align="center">2115.4600</td>
 <td align="center">1.0023</td>
 </tr>
 <tr class="even">
@@ -1870,7 +1871,7 @@ heuristic to diagnose lack of convergence.</p>
 <td align="center">11.6888</td>
 <td align="center">2467.9100</td>
 <td align="center">2285.5200</td>
-<td align="center">2917.1500</td>
+<td align="center">2873.0000</td>
 <td align="center">1.0015</td>
 </tr>
 </tbody>
@@ -1892,7 +1893,7 @@ z = draws[z_keys].loc[sample_idx].T.to_numpy()
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.grid(alpha=.5)
 ax.plot(stan_data[&#39;t&#39;], z, alpha=.5, linewidth=.5)
-ax.scatter(t, df[&#39;y&#39;], s=10, c=&#39;black&#39;, zorder=2)
+ax.scatter(t, y, s=10, c=&#39;black&#39;, zorder=2)
 ax.set_xlabel(&#39;Time&#39;)
 ax.set_ylabel(&#39;z&#39;, rotation=0.)
 fig.tight_layout()</code></pre>
@@ -1911,18 +1912,18 @@ p(y^\text{rep} \, | \, y) = \int p(y^\text{rep} \, | \, \theta) p(\theta
 <p>The fit model should be able to generate data under the posterior
 predictive distribution that resembles the observed data <span class="citation">(Gelman et al. 2013)</span>:</p>
 <pre class="python"><code>y_keys = [f&#39;y_rep[{i + 1}]&#39; for i in range(stan_data[&#39;N&#39;])]
-y = (y_draws := draws[y_keys].T.to_numpy()).mean(-1)
-d = np.sort(np.sqrt(np.square((y_draws - y[:, None]))), -1)
+y_means = (y_draws := draws[y_keys].T.to_numpy()).mean(-1)
+d = np.sort(np.sqrt(np.square((y_draws - y_means[:, None]))), -1)
 levels, colors, fills = (.95, .8, .5), (&#39;#e2c6a6&#39;, &#39;#d1b150&#39;, &#39;#d17d68&#39;), []
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.grid(alpha=.5)
 
 for level, color in zip(levels, colors):
     h = d[:, round(level*d.shape[1])]
-    fills.append(ax.fill_between(stan_data[&#39;t&#39;], y - h, y + h, color=color, zorder=2))
+    fills.append(ax.fill_between(stan_data[&#39;t&#39;], y_means - h, y_means + h, color=color, zorder=2))
 
-ax.plot(stan_data[&#39;t&#39;], y, linewidth=2., color=&#39;black&#39;)
-ax.scatter(t, df[&#39;y&#39;], s=10, c=&#39;black&#39;, zorder=2)
+ax.plot(stan_data[&#39;t&#39;], y_means, linewidth=2., color=&#39;black&#39;)
+ax.scatter(t, y, s=10, c=&#39;black&#39;, zorder=2)
 ax.set_xlabel(&#39;Time&#39;)
 ax.set_ylabel(&#39;z&#39;, rotation=0.)
 fig.legend(fills, levels, title=&#39;level&#39;, bbox_to_anchor=(1.12, .68))
@@ -1954,7 +1955,7 @@ for (i, param), color in zip(enumerate(param_keys), colors):
     violin[&#39;bodies&#39;][0].set_alpha(1.)
     violin[&#39;bodies&#39;][0].set_zorder(2)
     d = np.argsort(np.sqrt(np.square((param_draws - param_mean))))
-    level_50, level_95 = param_draws[d[:round(.5*len(draws))]], param_draws[d[:round(.95*len(draws))]]
+    level_50, level_95 = param_draws[d[:round(.5*n_draws)]], param_draws[d[:round(.95*n_draws)]]
     ax.plot(level_50, (i - .005)*np.ones_like(level_50), linewidth=3., color=&#39;#683f34&#39;)
     ax.plot(level_95, (i - .005)*np.ones_like(level_95), linewidth=1., color=&#39;#683f34&#39;)
     ax.scatter(param_mean, i, zorder=2, color=&#39;#683f34&#39;)

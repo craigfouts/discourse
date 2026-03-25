@@ -14,7 +14,7 @@ bibliography: references.bib
 
 # Introduction
 
-This article intended to be a guide for fitting Ordinary Differential Equation (ODE) models using Python and Stan via CmdStanPy (a Python interface to CmdStan), where Stan is a probabilistic programming language for performing Bayesian inference and CmdStan is its command line interface. Often, when modelling, we want to be able to quantify the uncertainty of our estimates. Bayesian inference allows us to do this in a principled manner for ODE models. All technical details mentioned here closely follow the [Stan](https://mc-stan.org/docs/stan-users-guide/) [@stan2025] user manual and Bayesian Data Analysis textbook [@gelman2013]. For a more detailed explanation on modelling with Stan, please refer to the [Stan](https://mc-stan.org/docs/) and [CmdStanPy](https://mc-stan.org/cmdstanpy/) documentation.
+This article intended to be a guide for fitting ordinary differential equation (ODE) models using Python and Stan via CmdStanPy (a Python interface to CmdStan), where Stan is a probabilistic programming language for performing Bayesian inference and CmdStan is its command line interface. Often, when modelling, we want to be able to quantify the uncertainty of our estimates. Bayesian inference allows us to do this in a principled manner for ODE models. All technical details mentioned here closely follow the [Stan](https://mc-stan.org/docs/stan-users-guide/) [@stan2025] user manual and Bayesian Data Analysis textbook [@gelman2013]. For a more detailed explanation on modelling with Stan, please refer to the [Stan](https://mc-stan.org/docs/) and [CmdStanPy](https://mc-stan.org/cmdstanpy/) documentation.
 
 Before going through the example, let's import the relevant libraries and set a random seed.
 
@@ -47,24 +47,24 @@ The mean population, $z(t)$, grows over time, $t$, at a growth rate of $\rho$. G
 
 # The Data
 
-The fake data (provided in `data/data.Rda`) was actually generated using our logistic model. That being said, for the purposes of this example, we will imagine the data, $y$, is the concentration of some population growing over time, $t$, that has been recorded in an experiment in which we assume some observational noise has been introduced during data collection. The aim is to fit the logistic ODE to this collected data, estimate important parameter values (like the growth rate, $\beta$), and to quantify the uncertainty of our estimates.
+The fake data (provided in `data/data.Rda`) was actually generated using our logistic model. That being said, for the purposes of this example, we will imagine the data, $y$, is the concentration of some population growing over time, $t$, that has been recorded in an experiment in which we assume some observational noise has been introduced during data collection. The aim is to fit the logistic ODE to this collected data, estimate important parameter values (like the growth rate, $\rho$), and to quantify the uncertainty of our estimates.
 
 ## Visualisation
 
 First, let's read in the data from `data/data.Rda`:
 
 ```{python}
-df = pyreadr.read_r('data/data.Rda')[None]
-Markdown(df.head().to_markdown(index=False, numalign='center', floatfmt='.6f'))
+data_df = pyreadr.read_r('data/data.Rda')[None]
+Markdown(data_df.head().to_markdown(index=False, numalign='center', floatfmt='.6f'))
 ```
 
 Let's plot the data to see what it looks like:
 
 ```{python, fig.align='center'}
-t = df['time']
+y, t = data_df.values.T
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.grid(alpha=.5)
-ax.scatter(t, df['y'], s=100, zorder=2)
+ax.scatter(t, y, s=100, zorder=2)
 ax.set_xlabel('Time')
 ax.set_ylabel(ylabel='y', rotation=0.)
 fig.tight_layout()
@@ -76,15 +76,15 @@ Next, we'll have to create a custom data object since Stan expects a particular 
 
 ```{python}
 # Only want to solve the ODE at unique time points to reduce runtime
-time_pts = np.sort(t.unique())
+time_pts = np.sort(np.unique(t))
 
 # Dictionary of data corresponding to the model definition in 'cmdstanpy.stan'
 stan_data = {
-    'N': len(df),
+    'N': len(data_df),
     'T': len(time_pts),
-    'y': df['y'].to_numpy(),
+    'y': y,
     't': time_pts,
-    't_idx': [np.where(time_pts == t)[0].item() + 1 for t in df['time']],
+    't_idx': [np.where(time_pts == time_pt)[0].item() + 1 for time_pt in t],
     'include_likelihood': True
 }
 ```
@@ -219,7 +219,8 @@ fig.tight_layout()
 The trace plots look okay. However, visual assessment can be subjective, so convergence is also assessed using the Gelman-Rubin metric, $\widehat{\, R}$ [@vehtari2021], which can be thought of as a numerical value summarising the above. Usually, a value of $\widehat{\, R}$ > 1.01 is used as a heuristic to diagnose lack of convergence.
 
 ```{python}
-Markdown(fit.summary().head()[1:].to_markdown(numalign='center', floatfmt='.4f'))
+summary_df = fit.summary().head()[1:]
+Markdown(summary_df.to_markdown(numalign='center', floatfmt='.4f'))
 ```
 
 The $\widehat{\, R}$ values listed in the last column of the table above look to be < 1.01!
@@ -235,13 +236,13 @@ z = draws[z_keys].loc[sample_idx].T.to_numpy()
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.grid(alpha=.5)
 ax.plot(stan_data['t'], z, alpha=.5, linewidth=.5)
-ax.scatter(t, df['y'], s=10, c='black', zorder=2)
+ax.scatter(t, y, s=10, c='black', zorder=2)
 ax.set_xlabel('Time')
 ax.set_ylabel('z', rotation=0.)
 fig.tight_layout()
 ```
 
-Here, the lines are draws of the ODE solution, $z(t)$, that are obtained using samples from the posterior $p(\theta \, | \, y)$, and the dots show the data points, $y$, used to fit the model. 
+Here, the lines are draws of the ODE solution, $z(t)$, that are obtained using samples from the posterior $p(\theta \, | \, y)$, and the dots show the data points, $y$, used to fit the model.
 
 We can also plot samples from the posterior predictive distribution, $p(y^\text{rep} \, | \, y)$, to check how well our entire model, with assumed priors and likelihood, fits the data [@gelman2013]:
 
@@ -253,18 +254,18 @@ The fit model should be able to generate data under the posterior predictive dis
 
 ```{python, fig.align='center'}
 y_keys = [f'y_rep[{i + 1}]' for i in range(stan_data['N'])]
-y = (y_draws := draws[y_keys].T.to_numpy()).mean(-1)
-d = np.sort(np.sqrt(np.square((y_draws - y[:, None]))), -1)
+y_means = (y_draws := draws[y_keys].T.to_numpy()).mean(-1)
+d = np.sort(np.sqrt(np.square((y_draws - y_means[:, None]))), -1)
 levels, colors, fills = (.95, .8, .5), ('#e2c6a6', '#d1b150', '#d17d68'), []
 fig, ax = plt.subplots(figsize=(8, 4))
 ax.grid(alpha=.5)
 
 for level, color in zip(levels, colors):
     h = d[:, round(level*d.shape[1])]
-    fills.append(ax.fill_between(stan_data['t'], y - h, y + h, color=color, zorder=2))
+    fills.append(ax.fill_between(stan_data['t'], y_means - h, y_means + h, color=color, zorder=2))
 
-ax.plot(stan_data['t'], y, linewidth=2., color='black')
-ax.scatter(t, df['y'], s=10, c='black', zorder=2)
+ax.plot(stan_data['t'], y_means, linewidth=2., color='black')
+ax.scatter(t, y, s=10, c='black', zorder=2)
 ax.set_xlabel('Time')
 ax.set_ylabel('z', rotation=0.)
 fig.legend(fills, levels, title='level', bbox_to_anchor=(1.12, .68))
@@ -277,7 +278,7 @@ Here, "level" refers to the $100 \times$ level % credible interval of the poster
 
 Once the model has been visually assessed as we did in the previous section, we can go ahead and visualise the posterior distribution of the parameters themselves. Since we have fit the model to its own fake data, we can also compare our inferred distributions to the true parameter values that were used to generate the fake data and thus check the validity of our parameter estimates:
 
-```{python, results='hide', fig.aling='center'}
+```{python, fig.aling='center'}
 true_params = pyreadr.read_r('data/params.Rda')['params']
 param_keys = [param for param in params if param in true_params][::-1]
 fig, ax = plt.subplots(figsize=(8, 4))
@@ -290,7 +291,7 @@ for (i, param), color in zip(enumerate(param_keys), colors):
     violin['bodies'][0].set_alpha(1.)
     violin['bodies'][0].set_zorder(2)
     d = np.argsort(np.sqrt(np.square((param_draws - param_mean))))
-    level_50, level_95 = param_draws[d[:round(.5*len(draws))]], param_draws[d[:round(.95*len(draws))]]
+    level_50, level_95 = param_draws[d[:round(.5*n_draws)]], param_draws[d[:round(.95*n_draws)]]
     ax.plot(level_50, (i - .005)*np.ones_like(level_50), linewidth=3., color='#683f34')
     ax.plot(level_95, (i - .005)*np.ones_like(level_95), linewidth=1., color='#683f34')
     ax.scatter(param_mean, i, zorder=2, color='#683f34')
