@@ -181,12 +181,12 @@ ax.set_ylabel('z', rotation=0.)
 fig.tight_layout()
 ```
 
-Here, the lines are draws of the ODE solution, $z(t)$, that are obtained using samples from the posterior $p(\theta \, | \, y)$, and the dots show the data points, $y$, used to fit the model.
+Here, the lines are draws of the ODE solution, $z(t)$, that are obtained using samples from the posterior $p \left( \theta \, | \, y \right)$, and the dots show the data points, $y$, used to fit the model.
 
-We can also plot samples from the posterior predictive distribution, $p(y^\text{rep} \, | \, y)$, to check how well our entire model, with assumed priors and likelihood, fits the data [@gelman2013]:
+We can also plot samples from the posterior predictive distribution, $p \left( y^\text{rep} \, | \, y \right)$, to check how well our entire model, with assumed priors and likelihood, fits the data [@gelman2013]:
 
 $$
-p(y^\text{rep} \, | \, y) = \int p(y^\text{rep} \, | \, \theta) p(\theta \, | \, y) d\theta
+p \left( y^\text{rep} \, | \, y \right) = \int p \left( y^\text{rep} \, | \, \theta \right) p \left( \theta \, | \, y \right) d\theta
 $$
 
 The fit model should be able to generate data under the posterior predictive distribution that resembles the observed data [@gelman2013]:
